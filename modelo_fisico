@@ -1,0 +1,190 @@
+CREATE DATABASE FaculdadeBancos;
+USE FaculdadeBancos;
+
+CREATE TABLE Aluno (
+    id_aluno INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    cpf VARCHAR(14) UNIQUE NOT NULL,
+    data_nascimento DATE NOT NULL,
+    email VARCHAR(100) NOT NULL,
+    status ENUM('ativo', 'inativo') DEFAULT 'ativo'
+);
+
+CREATE TABLE Curso (
+    id_curso INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    carga_horaria INT NOT NULL
+);
+
+CREATE TABLE Professor (
+    id_professor INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    especialidade VARCHAR(50)
+);
+
+CREATE TABLE Disciplina (
+    id_disciplina INT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    id_curso INT NOT NULL,
+    id_professor INT NOT NULL,
+    FOREIGN KEY (id_curso) REFERENCES Curso(id_curso),
+    FOREIGN KEY (id_professor) REFERENCES Professor(id_professor)
+);
+
+CREATE TABLE Matricula (
+    id_matricula INT AUTO_INCREMENT PRIMARY KEY,
+    id_aluno INT NOT NULL,
+    id_curso INT NOT NULL,
+    data_matricula DATE NOT NULL,
+    FOREIGN KEY (id_aluno) REFERENCES Aluno(id_aluno) ON DELETE CASCADE,
+    FOREIGN KEY (id_curso) REFERENCES Curso(id_curso)
+);
+
+INSERT INTO Aluno (nome, cpf, data_nascimento, email) VALUES
+('João Silva', '123.456.789-10', '2000-05-15', 'joao@gmail.com'),
+('Maria Souza', '987.654.321-00', '1999-08-21', 'maria@gmail.com');
+
+INSERT INTO Curso (nome, carga_horaria) VALUES
+('Ciência da Computação', 4000),
+('Engenharia Civil', 4500);
+
+INSERT INTO Professor (nome, especialidade) VALUES
+('Dr. Carlos', 'Algoritmos'),
+('Dra. Ana', 'Construção Civil');
+
+INSERT INTO Disciplina (nome, id_curso, id_professor) VALUES
+('Programação', 1, 1),
+('Estruturas', 2, 2);
+
+INSERT INTO Matricula (id_aluno, id_curso, data_matricula) VALUES
+(1, 1, '2024-01-10'),
+(2, 2, '2024-01-15');
+
+UPDATE Aluno SET email = 'joaosilva@gmail.com' WHERE id_aluno = 1;
+
+UPDATE Disciplina SET id_professor = 2 WHERE id_disciplina = 1;
+
+UPDATE Matricula SET id_curso = 2 WHERE id_matricula = 1;
+
+DELETE FROM Aluno WHERE id_aluno = 2;
+
+
+DELIMITER //
+CREATE PROCEDURE MatricularAluno(IN idAluno INT, IN idCurso INT)
+BEGIN
+    INSERT INTO Matricula (id_aluno, id_curso, data_matricula) VALUES (idAluno, idCurso, NOW());
+END;
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE ListarAlunosCurso(IN idCurso INT)
+BEGIN
+    SELECT a.nome FROM Aluno a
+    JOIN Matricula m ON a.id_aluno = m.id_aluno
+    WHERE m.id_curso = idCurso;
+END;
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE AtualizarProfessorDisciplina(IN idDisciplina INT, IN idProfessor INT)
+BEGIN
+    UPDATE Disciplina SET id_professor = idProfessor WHERE id_disciplina = idDisciplina;
+END;
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION ContarAlunosCurso(idCurso INT) RETURNS INT
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE total INT;
+    SELECT COUNT(*) INTO total FROM Matricula WHERE id_curso = idCurso;
+    RETURN total;
+END;
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION MediaCargaHoraria() RETURNS DECIMAL(10,2)
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    DECLARE media DECIMAL(10,2);
+    SELECT AVG(carga_horaria) INTO media FROM Curso;
+    RETURN media;
+END;
+//
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION VerificarMatricula(idAluno INT, idCurso INT) RETURNS BOOLEAN
+DETERMINISTIC
+READS SQL DATA
+BEGIN
+    RETURN EXISTS (
+        SELECT 1 FROM Matricula WHERE id_aluno = idAluno AND id_curso = idCurso
+    );
+END;
+//
+DELIMITER ;
+
+CREATE TABLE LogAlteracoes (
+    id_log INT AUTO_INCREMENT PRIMARY KEY,
+    descricao TEXT NOT NULL,
+    data TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+DELIMITER //
+
+CREATE TRIGGER LogInsertAluno 
+AFTER INSERT ON Aluno 
+FOR EACH ROW
+BEGIN
+    INSERT INTO LogAlteracoes (descricao) 
+    VALUES (CONCAT('Aluno inserido: ', NEW.nome));
+END //
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE TRIGGER LogUpdateAluno
+AFTER UPDATE ON Aluno
+FOR EACH ROW
+BEGIN
+    INSERT INTO LogAlteracoes (descricao)
+    VALUES (CONCAT('Aluno atualizado: ', NEW.nome));
+END //
+
+DELIMITER ;
+
+DELIMITER //
+
+CREATE TRIGGER LogDeleteAluno
+AFTER DELETE ON Aluno
+FOR EACH ROW
+BEGIN
+    INSERT INTO LogAlteracoes (descricao)
+    VALUES (CONCAT('Aluno excluído: ', OLD.nome));
+END //
+
+DELIMITER ;
+
+SELECT a.nome AS aluno, c.nome AS curso /*join alunos e cursos*/
+FROM Aluno a
+JOIN Matricula m ON a.id_aluno = m.id_aluno
+JOIN Curso c ON c.id_curso = m.id_curso;
+
+
+SELECT c.nome, COUNT(m.id_matricula) AS total_matriculas /*group by e having*/
+FROM Curso c
+JOIN Matricula m ON c.id_curso = m.id_curso
+GROUP BY c.nome
+HAVING total_matriculas > 1;
+
+SELECT * FROM Aluno ORDER BY nome; /*order by*/
+
+SELECT * FROM Curso WHERE carga_horaria > 4000; /*where*/
